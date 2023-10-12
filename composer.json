@@ -1,6 +1,6 @@
 {
     "name": "lyngdev/capital_dot_com_sdk",
-    "description": "A php SDK for capital.com web API",
+    "description": "WORK IN PROGRESS. SDK based on Capital.com API",
     "type": "library",
     "require": {
         "php": "8.*",
