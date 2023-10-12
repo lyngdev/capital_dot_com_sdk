@@ -30,10 +30,10 @@ class CapitalClient
     public function hasRequiredAuthOptions():bool{
         foreach($this->auth_options as $k => $v){
             if($v === '' || $v === null){
-                return true;
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
     public function testUrl(string $url){
