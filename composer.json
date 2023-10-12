@@ -3,7 +3,8 @@
     "description": "A php SDK for capital.com web API",
     "type": "library",
     "require": {
-        "php": "8.*"
+        "php": "8.*",
+        "ext-curl": "*"
     },
     "license": "MIT",
     "autoload": {
