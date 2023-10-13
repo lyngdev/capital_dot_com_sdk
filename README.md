@@ -1,4 +1,4 @@
-# Capital.com REST API php SDK
+# Unofficial Capital.com REST API php SDK
 
 <span style="color:red">Still a work in progress. Not yet ready for release</span>
 

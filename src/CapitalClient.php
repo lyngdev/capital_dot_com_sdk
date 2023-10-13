@@ -7,8 +7,6 @@ use lyngdev\CapitalDotComSDK\Exceptions\CapitalDotComMissingAuthenticationOption
 class CapitalClient
 {
     private const API_BASE_URL = 'https://api-capital.backend-capital.com/api/v1/';
-    private bool $authenticated = false;
-    private float $authenticated_timestamp = -1;
     private array $auth_options = [
         'api_key' => '',
         'clear_password' => '',
@@ -16,17 +14,26 @@ class CapitalClient
     ];
     private array $session_data;
 
-    public function __construct()
+    public function __construct(string|array $identifierOrOptions = '', string $password = '', string $api_key = '')
     {
+        if($identifierOrOptions && is_array($identifierOrOptions)){
+            $this->setAuthOptions($identifierOrOptions);
+        }
         $this->invalidateCurrentSession();
     }
 
+    /**
+     * @param array $options
+     */
     public function setAuthOptions(array $options){
         foreach(array_keys($this->auth_options) as $k){
             $this->auth_options[$k] = $options[$k];
         }
     }
 
+    /**
+     * @return bool
+     */
     public function hasRequiredAuthOptions():bool{
         foreach($this->auth_options as $k => $v){
             if($v === '' || $v === null){
@@ -36,25 +43,62 @@ class CapitalClient
         return true;
     }
 
-    public function testUrl(string $url){
-        return $this->curlGet($url);
-    }
-
+    /**
+     * @throws CapitalDotComMissingAuthenticationOptionsException
+     */
     public function auth(){
         $this->fetchSession();
     }
 
     public function getPositions(): object|bool|array|null
     {
-        return $this->curlGet(self::API_BASE_URL . 'positions')->getJsonDecodedBody();
+        return $this->curlGet(self::API_BASE_URL . 'positions',$this->getStandardSessionHeaders())->getJsonDecodedBody();
     }
 
+    public function getOrders(){
+        return $this->curlGet(self::API_BASE_URL . 'workingorders',$this->getStandardSessionHeaders())->getJsonDecodedBody();
+    }
+
+    public function getTopLevelMarketCategories(){
+        return $this->curlGet(self::API_BASE_URL . 'marketnavigation',$this->getStandardSessionHeaders())->getJsonDecodedBody();
+    }
+
+    /**
+     * Ping the service to keep a trading session alive
+     *
+     * @return mixed
+     */
+    public function pingSession(){
+        return $this->curlGet(self::API_BASE_URL . 'ping',$this->getStandardSessionHeaders())->getJsonDecodedBody();
+    }
+
+    /**
+     * Test connectivity to the API and get the current server time
+     * Note: No auth required for this endpoint
+     */
+    public function getServerTime(){
+        return $this->curlGet(self::API_BASE_URL . 'time')->getJsonDecodedBody();
+    }
+
+    private function getStandardSessionHeaders():array{
+        return [
+            'X-SECURITY-TOKEN: ' . $this->getSessionSecurityToken(),
+            'CST: ' . $this->getSessionCSTToken()
+        ];
+    }
+
+    /**
+     * @return string
+     */
     private function getSessionSecurityToken():string{
-        return $this->session_data['headers']['X-SECURITY-TOKEN'] ?? '';
+        return $this->session_data['headers']['x-security-token'] ?? '';
     }
 
+    /**
+     * @return string
+     */
     private function getSessionCSTToken():string{
-        return $this->session_data['headers']['CST'] ?? '';
+        return $this->session_data['headers']['cst'] ?? '';
     }
 
     private function fetchSession(){
@@ -63,13 +107,15 @@ class CapitalClient
         }
 
         $parameters = [
-            'identifier' => $this->auth_options['login'],
+            'identifier' => $this->auth_options['identifier'],
             'password' => $this->auth_options['clear_password'],
+            ''
         ];
         $headers = [
             'X-CAP-API-KEY: ' . $this->auth_options['api_key'],
             'Content-Type: application/json'
         ];
+
         $sessionResponse = $this->curlPost(self::API_BASE_URL . 'session', $parameters, $headers);
 
         $decoded = $sessionResponse->getJsonDecodedBody();
@@ -77,9 +123,17 @@ class CapitalClient
         if($decoded && ($decoded['clientId'] ?? false)){
             $this->session_data['body'] = $decoded;
             $this->session_data['headers'] = $sessionResponse->getHeaderArray();
+            if($this->getSessionCSTToken() && $this->getSessionSecurityToken()){
+                $this->authenticated = true;
+            }
+        }else{
+            $this->authenticated = false;
         }
     }
 
+    /**
+     * Invalidates the current CST and Security Token
+     */
     private function invalidateCurrentSession(){
         $this->session_data = [
             'CST' => '',
@@ -89,11 +143,11 @@ class CapitalClient
 
     private function curlPost(string $url, array $parameters = [], array $headers = []){
         $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $parameters);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($parameters));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_HEADER, true);
-        curl_setopt($ch, CURLOPT_VERBOSE, true);
+        //curl_setopt($ch, CURLOPT_VERBOSE, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         $response = curl_exec($ch);
@@ -125,7 +179,7 @@ class CapitalClient
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_HEADER, true);
-        curl_setopt($ch, CURLOPT_VERBOSE, true);
+        //curl_setopt($ch, CURLOPT_VERBOSE, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         $response = curl_exec($ch);

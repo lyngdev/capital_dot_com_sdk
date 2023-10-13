@@ -17,8 +17,14 @@ class CurlResponse
         $this->error = $error;
     }
 
-    public function getJsonDecodedBody(bool $associative = true):false|object|array{
-        return json_decode($this->body, $associative);
+    public function getJsonDecodedBody(bool $associative = true):mixed{
+        if($decoded = json_decode($this->body, $associative)){
+            return $decoded;
+        }
+        if($associative){
+            return [];
+        }
+        return null;
     }
 
     public function getRawBody():string{
